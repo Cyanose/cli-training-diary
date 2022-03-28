@@ -88,6 +88,11 @@ string basic_select(string day){
 	      	reps, weight*series*reps as load\
 	      	FROM TRAINING WHERE day = "+day+";";
 };
+string simple_select(string day){
+	embed(day);
+	return "SELECT distinct exercise_name \"exercise name\"\
+		FROM TRAINING WHERE day = "+day+";";
+};
 string select_total_load(string day){
 	embed(day);
 	return "SELECT sum(weight*series*reps) \"total load\"\
@@ -116,8 +121,7 @@ int menu(){
 	cout<<"3.print the data about trainings in the specified time-frame"<<endl;
 	cout<<"enter the number: ";
 	cin>>choice;
-	if(choice<1&&choice>3)
-	{
+	if(choice<1&&choice>3){
 		cout<<"invalid input"<<endl;
 		exit(1);
 	}
@@ -145,7 +149,18 @@ void display_data_for_day(){
 	string input;
 	cout<<"which training day would you like to print info about: ";
 	cin>>input;
-	string day=validate_date_format(input);
+	string day;
+
+	if(strcasecmp(input.c_str(),"today") == 0){
+		day=format_date();
+	}
+	else if(strcasecmp(input.c_str(),"yesterday") == 0){
+		day=format_date(ltm->tm_mday-1);
+	}
+	
+	else{
+		day=validate_date_format(input);
+	}
 	string query=basic_select(day);
 	cout<<endl;
 	cout<<day<<endl;
@@ -155,14 +170,32 @@ void display_data_for_day(){
 };
 /* function for case3 */
 void display_data_for_period(){
-	string input;
+	string input, first_day, last_day;
+	bool short_display=false;
 	cout<<"enter the first date of period: ";
-	cin>>input;
-	string first_day = validate_date_format(input);
+	cin.ignore();
+	getline(cin,input);
+
+	//setting flag for short display
+	if(input.find("-s")!=string::npos){
+		short_display=true;
+		input.pop_back();
+		input.pop_back();
+		input.pop_back();
+		//cout<<input<<endl;
+	}
+
+	if(strcasecmp(input.c_str(),"week") == 0){
+		last_day=format_date();
+		first_day=format_date(ltm->tm_mday-6);
+	}
+	else{
+	first_day = validate_date_format(input);
 	cout<<"enter the last day of period: ";
 	cin>>input;
+	last_day=validate_date_format(input);
+	}
 	cout<<endl;
-	string last_day=validate_date_format(input);
 	regex reg("\\b[0-9]{1,2}");
 	smatch m;
 	regex_search(first_day,m,reg);
@@ -170,12 +203,21 @@ void display_data_for_period(){
 	sscanf(m.str().c_str(),"%d",&day_first);
 	regex_search(last_day,m,reg);
 	sscanf(m.str().c_str(),"%d",&day_last);
-	for(int i=day_first;i<=day_last;i++)
-	{
-		string day =format_date(i);
-		cout<<day<<endl;
-		rc=sqlite3_exec(db, basic_select(day).c_str(),callback, 0, &err_msg);
-		rc=sqlite3_exec(db, select_total_load(day).c_str(),callback, 0, &err_msg);
+
+	if(short_display){
+		for(int i=day_first;i<=day_last;i++){
+			string day =format_date(i);
+			cout<<day<<endl;
+			rc=sqlite3_exec(db, simple_select(day).c_str(),callback, 0, &err_msg);
+		}
+	}
+	else{
+		for(int i=day_first;i<=day_last;i++){
+			string day =format_date(i);
+			cout<<day<<endl;
+			rc=sqlite3_exec(db, basic_select(day).c_str(),callback, 0, &err_msg);
+			rc=sqlite3_exec(db, select_total_load(day).c_str(),callback, 0, &err_msg);
+		}
 	}
 };
 
